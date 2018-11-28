@@ -42,10 +42,12 @@ library(stargazer)
 
 # a. Read in data as 'homes':
 
+homes <-read_csv("slo_homes.csv")
 
 # b. Filter to only include cities "San Luis Obispo", "Santa Maria-Orcutt", "Atascadero", and "Arroyo Grande", and call this new subset 'homes_sub':
 
-
+homes_sub <- homes %>% 
+  filter(City== "San Luis Obispo"| City=="Santa Maria-Orcutt"|City =="Atascadero"|City=="Arroyo Grande")
 
 ```
 
@@ -108,8 +110,12 @@ Use summary() to view the model output and statistics.
 
 # a. Saturated model: 
 
+homes_lm1 <- lm (Price ~ City+Bedrooms+Bathrooms+SqFt+PricePerSqFt+Status, data=homes_sub)
+
 
 # b. Model summary:
+
+summary(homes_lm1)
 
 ```
 
@@ -119,7 +125,16 @@ The next model: Exclude price per square foot, and bedrooms/bathrooms (since the
 
 # a. Updated model with variables City, SqFt, and Status:
 
+homes_lm2<- lm(Price ~ City+SqFt+Status, data=homes_sub)
+
 # b. Model summary:
+summary(homes_lm2)
+
+# looking at summary, the difference between short sale houses and forclousure are very close... and not significantly differnet in mean sale values; however, the difference between foreclousure and regular are very significantly different
+
+# a house in Atascadero is expected to sell for much less than in Arroyo Grande, whereas a house in SLO would be much more compared to Arroyo Grande, and a house in Santa Maria would be less than the same house in Arroyo Grande
+
+# There is some error associated with this-- we will NEVER get the right model. What can improve this model? Overall, this model is highly significant (better than random chance predicting the price of a house). As expected, multiple and adjusted R-squared values are very close. Right now 53% of the change in the price are explained by the variables in the model. How can we change this? Add other predictor variables: age of home, school district, etc.
 
 ```
 
@@ -128,21 +143,27 @@ Wait...but what if I wanted everything to be with respect to a Regular sale stat
 ```{r fct_relevel}
 
 # a. Set Status to class 'factor'
+homes_sub$Status <- factor(homes_sub$Status)
+# okay with overriding the column because not REALLY changing the information, just the type of the data (the way that R sees it)
 
 
 # b. Check to ensure it's a factor now
-
+# Use class()
 
 # c. Check levels:
-
+# use levels()
 
 # d. Reassign reference level of "Status" to "Regular":
 
+# use fct_relevel() function in forcats to change the levels of the factors
+homes_sub$Status <- fct_relevel(homes_sub$Status, "Regular")
+# takes that level "Regular" and puts in first; everything else is still alphabetical but after
 
 # e. Now run the regression again - same equation, but now the reference level is different (Status = Regular): 
 
+homes_lm3 <- lm(Price~ City + SqFt + Status, data=homes_sub)
 
-
+summary(homes_lm3)
 ```
 
 Interpret the coefficients and statistical outcomes above. 
@@ -158,6 +179,13 @@ Then we can evaluate model diagnostics using the plot() function:
 
 # a. Model diagnostics:
 
+plot(homes_lm3)
+
+# heteroscedasticity = yes! (mostly, except for a few points)
+# normality of residuals = yes! (mostly, except at the ends)
+
+# thinking about what these actually mean, house 188 sold for much less than predited by our model (so buy that one!) whereas the points way way up high sold for more than their worth, according to our model
+
 ```
 
 ###6. Model comparison by Akaike Information Criterion
@@ -167,8 +195,13 @@ The AIC is a quantitative metric for model "optimization" that balances complexi
 ```{r AIC}
 
 # a. AIC values for each model
-
+full_aic<- AIC(homes_lm1)
+final_aic<- AIC(homes_lm3)
 # Answer: which would you pick? 
+
+#AIC value as a BINARY TOOL only, but without using your brain, then I would use the first model homes_lm1 over the other one, BUT based on all else, there is NO GOOD REASON TO EVER USE THAT MODEL EVER.
+
+# Statistics is no substitute for judgement.
 
 ```
 
@@ -178,9 +211,9 @@ The AIC is a quantitative metric for model "optimization" that balances complexi
 
 # a. Prepare a nice regression table:
 
+stargazer(homes_lm1, homes_lm3, type = "html")
 
-
-# Note: If you want to work with this in Word, save to html, open, copy and paste into Word. 
+# Note: If you want to work with this in Word, save to html, open, copy and paste into Word. Stargazer does not knit nicely if it is direct to Word!
 
 ```
 
@@ -230,10 +263,14 @@ Make predictions for the new data using predict():
 
 # a. Make predictions using the new data frame:
 
+price_predict <- predict(homes_lm3, newdata=df_new, se.fit=TRUE, interval = "confidence")
+
 # b. Bind predictions to the data to make it actually useful:
 
+#predictions begin as a vector of values, but needs some context
+#create new df 
 
-
+predict_df <- data.frame(df_new, price_predict)
 ```
 
 Then visualize it!
@@ -242,6 +279,12 @@ Then visualize it!
 
 # Create a line graph with square footage on the x-axis, predicted price on y-axis, with color dependent on City and facet_wrapped by sale status (follow along):
 
+predict_graph <- ggplot(predict_df, aes(x=SqFt, y=fit.fit)) +
+  geom_line(aes(color=City))+
+  geom_point(data=homes_sub, aes(x=SqFt, y=Price), alpha=0.1) +
+  facet_wrap(~Status)
+
+predict_graph
 
 ```
 
